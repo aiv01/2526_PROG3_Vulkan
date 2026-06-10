@@ -420,6 +420,7 @@ void VulkanContext::CreateLogicalDevice()
 VkSurfaceFormatKHR VulkanContext::ChooseSwapSurfaceFormat(
     const std::vector<VkSurfaceFormatKHR>& InFormats)
 {
+    
     for (const auto& Format : InFormats)
         if (Format.format == VK_FORMAT_B8G8R8A8_SRGB &&
             Format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
@@ -430,6 +431,10 @@ VkSurfaceFormatKHR VulkanContext::ChooseSwapSurfaceFormat(
 VkPresentModeKHR VulkanContext::ChooseSwapPresentMode(
     const std::vector<VkPresentModeKHR>& InModes)
 {
+    if (VSyncEnabled)
+    {
+        return VK_PRESENT_MODE_FIFO_KHR;
+    }
     for (auto Mode : InModes)
         if (Mode == VK_PRESENT_MODE_MAILBOX_KHR) return Mode;
     return VK_PRESENT_MODE_FIFO_KHR; // guaranteed available
@@ -692,6 +697,7 @@ void VulkanContext::CleanupSwapchain()
     vkDestroyPipelineLayout(Device, PipelineLayout, nullptr);
 
     for (auto Sem : RenderFinishedSemaphores) vkDestroySemaphore(Device, Sem, nullptr);
+    RenderFinishedSemaphores.clear();//my add fix??
     for (auto Iv : SwapchainImageViews)       vkDestroyImageView(Device, Iv, nullptr);
     vkDestroySwapchainKHR(Device, Swapchain, nullptr);
 }
@@ -710,7 +716,8 @@ void VulkanContext::RecreateSwapchain()
 
     CleanupSwapchain();
     CreateSwapchain();
-    CreateImageViews();
+    CreateImageViews();//TODO have to add here new pipeline gr? search on the net
+    CreateGraphicsPipeline();//my add source Vulkan form + gemini doc reading
     CreateRenderFinishedSemaphores();
 }
 
@@ -733,6 +740,18 @@ VkShaderModule VulkanContext::CreateShaderModule(const std::string& InPath)
     CHECK_VK(vkCreateShaderModule(Device, &CreateInfo, nullptr, &Module), "Failed creating shader module");
     return Module;
 }
+
+//my add
+void VulkanContext::SetVSync(bool InEnabled)
+{
+    if (VSyncEnabled != InEnabled)
+    {
+        VSyncEnabled = InEnabled;
+        RecreateSwapchain();
+    }
+}
+
+
 
 void VulkanContext::CreateGraphicsPipeline()
 {
@@ -816,4 +835,7 @@ void VulkanContext::CreateGraphicsPipeline()
 
     vkDestroyShaderModule(Device, VertModule, nullptr);
     vkDestroyShaderModule(Device, FragModule, nullptr);
+
+
+
 }

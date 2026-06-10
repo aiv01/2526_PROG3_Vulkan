@@ -32,6 +32,7 @@ public:
     void Cleanup();
 
     void NotifyFramebufferResized() { FramebufferResized = true; }
+    void SetVSync(bool InEnabled);
 
 private:
     GLFWwindow*                  Window = nullptr;
@@ -62,6 +63,7 @@ private:
     std::vector<VkFence>         InFlightFences;
     uint32_t                     CurrentFrame       = 0;
     bool                         FramebufferResized = false;
+    bool                         VSyncEnabled = true;   //my add
     bool                         ValidationEnabled  = false;
 
     // Pipeline

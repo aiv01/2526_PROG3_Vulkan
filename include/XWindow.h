@@ -14,6 +14,7 @@ public:
     void SetVSync(bool InEnabled);
     int GetWidth() const;
     int GetHeight() const;
+    void CheckMonitorChange();
 
 private:
     int Width;
@@ -22,4 +23,5 @@ private:
     GLFWwindow* RawWindow;
     float DeltaTime;
     VulkanContext Context;
+    GLFWmonitor* CurrentMonitor = nullptr; //my add
 };
