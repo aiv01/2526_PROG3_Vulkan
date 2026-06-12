@@ -26,6 +26,21 @@ target_link_libraries(${EXEC_TARGET} PRIVATE
   glfw
 )
 
+file(GLOB_RECURSE SHADERS ${CMAKE_SOURCE_DIR}/resources/shaders/*.vert ${CMAKE_SOURCE_DIR}/resources/shaders/*.frag)
+foreach(SHADER ${SHADERS})
+  get_filename_component(SHADER_NAME ${SHADER} NAME)   # triangle.vert
+  set(SPV_OUTPUT ${CMAKE_SOURCE_DIR}/resources/shaders/${SHADER_NAME}.spv) # <full-path>/triangle.vert.spv
+  add_custom_command(
+    OUTPUT ${SPV_OUTPUT}
+    COMMAND Vulkan::glslc ${SHADER} -o ${SPV_OUTPUT}
+    DEPENDS ${SHADER}
+    COMMENT "Compiling ${SHADER_NAME} -> ${SHADER_NAME}.spv"
+  )
+  list(APPEND SPV_OUTPUTS ${SPV_OUTPUT})
+endforeach(SHADER ${SHADERS})
+add_custom_target(Shaders DEPENDS ${SPV_OUTPUTS})
+add_dependencies(${EXEC_TARGET} Shaders)
+
 # Post build: Copy Resources to bin
 set(ResourcesPath ${CMAKE_CURRENT_SOURCE_DIR}/resources)
 add_custom_command(TARGET ${EXEC_TARGET} POST_BUILD
