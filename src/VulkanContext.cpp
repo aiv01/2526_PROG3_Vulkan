@@ -717,7 +717,7 @@ void VulkanContext::RecreateSwapchain()
     CleanupSwapchain();
     CreateSwapchain();
     CreateImageViews();//TODO have to add here new pipeline gr? search on the net
-    CreateGraphicsPipeline();//my add source Vulkan form + gemini doc reading
+    CreateGraphicsPipeline();//my add source Vulkan to fix the resize error form + gemini doc reading
     CreateRenderFinishedSemaphores();
 }
 
@@ -741,7 +741,7 @@ VkShaderModule VulkanContext::CreateShaderModule(const std::string& InPath)
     return Module;
 }
 
-//my add
+//my add for Vsync
 void VulkanContext::SetVSync(bool InEnabled)
 {
     if (VSyncEnabled != InEnabled)
