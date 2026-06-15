@@ -95,6 +95,7 @@ void VulkanContext::Init(GLFWwindow* InWindow)
 
     // For Model pipeline
     CreateDepthResources();
+    CreateModelPipeline();
     CreateModelBuffers();
 
     CreateCommandPool();
@@ -667,7 +668,9 @@ void VulkanContext::RecordCommandBuffer(VkCommandBuffer InCmd, uint32_t InImageI
 
     vkCmdPipelineBarrier(InCmd,
         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
         0, 0, nullptr, 0, nullptr, BarrierCount, Barriers);
 
     // Dynamic rendering — no VkRenderPass or VkFramebuffer needed
@@ -1175,6 +1178,7 @@ void VulkanContext::CreateModelPipeline()
     RenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     RenderingInfo.colorAttachmentCount = 1;
     RenderingInfo.pColorAttachmentFormats = &SwapchainImageFormat;
+    RenderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 
 
     VkPushConstantRange PushRange{};
@@ -1206,7 +1210,7 @@ void VulkanContext::CreateModelPipeline()
     PipelineInfo.pDynamicState = &DynamicState;
     PipelineInfo.pMultisampleState = &Multisampling;
     PipelineInfo.pColorBlendState = &ColorBlend;
-    PipelineInfo.layout = PipelineLayout;
+    PipelineInfo.layout = ModelPipelineLayout;
     PipelineInfo.pDepthStencilState = &DepthStencil;
     PipelineInfo.renderPass = VK_NULL_HANDLE;
 

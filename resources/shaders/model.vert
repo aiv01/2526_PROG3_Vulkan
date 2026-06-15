@@ -1,4 +1,4 @@
-#version 460
+#version 450
 
 layout(location = 0) in vec3 InPosition;
 layout(location = 1) in vec3 InNormal;
@@ -14,7 +14,7 @@ layout(location = 1) out vec2 FragTexCoord;
 
 void main()
 {
-    gl_Position = PC.Mvp * vec3(InPosition, 1.0);
+    gl_Position = PC.Mvp * vec4(InPosition, 1.0);
     FragNormal = mat3(transpose(inverse(PC.Model))) * InNormal;
     FragTexCoord = InTexCoord;
 }
