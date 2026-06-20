@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 4.0)
 project(CMakeVulkan)
 
+
 set(EXEC_TARGET AppPrj)
 file(GLOB_RECURSE SOURCES ${CMAKE_SOURCE_DIR}/src/*.cpp)
 file(GLOB_RECURSE HEADERS ${CMAKE_SOURCE_DIR}/src/*.h ${CMAKE_SOURCE_DIR}/include/*.h)
@@ -21,6 +22,11 @@ if(MSVC)
     target_compile_options(${EXEC_TARGET} PRIVATE /Zc:preprocessor)
 endif()
 
+#fix on web
+set(CMAKE_MAP_IMPORTED_CONFIG_DEBUG Release)
+set(CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
+set(CMAKE_MAP_IMPORTED_CONFIG_MINSIZEREL Release)
+
 # Library linking and Headers import
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
@@ -34,19 +40,36 @@ target_link_libraries(${EXEC_TARGET} PRIVATE
   glm::glm
 )
 
-file(GLOB_RECURSE SHADERS ${CMAKE_SOURCE_DIR}/resources/shaders/*.vert ${CMAKE_SOURCE_DIR}/resources/shaders/*.frag)
-foreach(SHADER ${SHADERS})
-  get_filename_component(SHADER_NAME ${SHADER} NAME)   # triangle.vert
-  set(SPV_OUTPUT ${CMAKE_SOURCE_DIR}/resources/shaders/${SHADER_NAME}.spv) # <full-path>/triangle.vert.spv
-  add_custom_command(
-    OUTPUT ${SPV_OUTPUT}
-    COMMAND Vulkan::glslc ${SHADER} -o ${SPV_OUTPUT}
-    DEPENDS ${SHADER}
-    COMMENT "Compiling ${SHADER_NAME} -> ${SHADER_NAME}.spv"
-  )
-  list(APPEND SPV_OUTPUTS ${SPV_OUTPUT})
-endforeach(SHADER ${SHADERS})
-add_custom_target(Shaders DEPENDS ${SPV_OUTPUTS})
+set(SHADER_SOURCE ${CMAKE_SOURCE_DIR}/resources/shaders/triangle.glsl)
+
+add_custom_command(
+    OUTPUT ${CMAKE_SOURCE_DIR}/resources/shaders/triangle.vert.spv
+    COMMAND Vulkan::glslc
+            -DVERTEX_SHADER
+            -fshader-stage=vert
+            ${SHADER_SOURCE}
+            -o ${CMAKE_SOURCE_DIR}/resources/shaders/triangle.vert.spv
+    DEPENDS ${SHADER_SOURCE}
+    COMMENT "Compiling vertex shader"
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_SOURCE_DIR}/resources/shaders/triangle.frag.spv
+    COMMAND Vulkan::glslc
+            -DFRAGMENT_SHADER
+            -fshader-stage=frag
+            ${SHADER_SOURCE}
+            -o ${CMAKE_SOURCE_DIR}/resources/shaders/triangle.frag.spv
+    DEPENDS ${SHADER_SOURCE}
+    COMMENT "Compiling fragment shader"
+)
+
+add_custom_target(Shaders
+    DEPENDS
+        ${CMAKE_SOURCE_DIR}/resources/shaders/triangle.vert.spv
+        ${CMAKE_SOURCE_DIR}/resources/shaders/triangle.frag.spv
+)
+
 add_dependencies(${EXEC_TARGET} Shaders)
 
 # Post build: Copy Resources to bin
