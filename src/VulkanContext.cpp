@@ -16,6 +16,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+struct PushData
+        {
+            glm::mat4 Mvp;
+            glm::mat4 Model;
+            glm::vec4 LightDir;
+            glm::vec4 LightColor;
+        };
 
 // ── Validation-layer configuration ───────────────────────────────────
 
@@ -764,8 +771,14 @@ void VulkanContext::RecordCommandBuffer(VkCommandBuffer InCmd, uint32_t InImageI
 
         glm::mat4 Mvp = Proj * View * Model;
 
-        struct { glm::mat4 Mvp; glm::mat4 Model; } PushData{ Mvp, Model };
-        vkCmdPushConstants(InCmd, ModelPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushData), &PushData);
+        
+        PushData Data{};
+        Data.Mvp = Mvp;
+        Data.Model = Model;
+        Data.LightDir = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);   // luce da destra
+        //Data.LightColor = glm::vec4(1.0f);                   // bianca
+        Data.LightColor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f); // rossa
+        vkCmdPushConstants(InCmd,ModelPipelineLayout,VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,sizeof(PushData),&Data);
         vkCmdBindIndexBuffer(InCmd, IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(InCmd, IndexCount, 1, 0, 0, 0);
     }
@@ -1207,9 +1220,9 @@ void VulkanContext::CreateModelPipeline()
 
 
     VkPushConstantRange PushRange{};
-    PushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    PushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     PushRange.offset = 0;
-    PushRange.size = 2 * sizeof(glm::mat4); // MVP + Model = 128 bytes
+    PushRange.size = sizeof(PushData); // oppure sizeof(la tua struct C++)
 
     VkPipelineLayoutCreateInfo LayoutInfo{};
     LayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
