@@ -752,7 +752,11 @@ void VulkanContext::RecordCommandBuffer(VkCommandBuffer InCmd, uint32_t InImageI
 
         float Aspect = static_cast<float>(SwapchainExtent.width) / static_cast<float>(SwapchainExtent.height);
 
+        //glm::mat4 Model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -2.0f, -4.f));
+        float Time = static_cast<float>(glfwGetTime());
+
         glm::mat4 Model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -2.0f, -4.f));
+        Model = glm::rotate(Model, Time, glm::vec3(0.0f, 1.0f, 0.0f));    
 
         glm::mat4 View = glm::lookAt(glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
         glm::mat4 Proj = glm::perspective(glm::radians(60.f), Aspect, 0.1f, 100.f);

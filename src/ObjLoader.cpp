@@ -63,59 +63,69 @@ ModelData LoadObj(const std::string& InPath)
     //for every index inside every shape we load the info in the support struct and Load it in the vertices array if not present
     for (const auto& Shape : Shapes)
     {
-        for (const auto& Index : Shape.mesh.indices)
+        const auto& Indices = Shape.mesh.indices;
+
+        for (size_t i = 0; i + 2 < Indices.size(); i += 3)
         {
-            PackedVertex Vertex{};
+            uint32_t TriangleIndices[3];
 
-            // Here i load Positions inside the struct
-            if (Index.vertex_index >= 0)
+            for (int Corner = 0; Corner < 3; ++Corner)
             {
-                const size_t P = static_cast<size_t>(Index.vertex_index) * 3; //loading the vertices from attrib at vertex index position
-                Vertex.Px = Attrib.vertices[P + 0];
-                Vertex.Py = Attrib.vertices[P + 1];
-                Vertex.Pz = Attrib.vertices[P + 2];
+                const auto& Index = Indices[i + Corner];
+
+                PackedVertex Vertex{};
+
+                if (Index.vertex_index >= 0)
+                {
+                    const size_t P = static_cast<size_t>(Index.vertex_index) * 3;
+                    Vertex.Px = Attrib.vertices[P + 0];
+                    Vertex.Py = Attrib.vertices[P + 1];
+                    Vertex.Pz = Attrib.vertices[P + 2];
+                }
+
+                if (Index.normal_index >= 0 && !Attrib.normals.empty())
+                {
+                    const size_t N = static_cast<size_t>(Index.normal_index) * 3;
+                    Vertex.Nx = Attrib.normals[N + 0];
+                    Vertex.Ny = Attrib.normals[N + 1];
+                    Vertex.Nz = Attrib.normals[N + 2];
+                }
+
+                if (Index.texcoord_index >= 0 && !Attrib.texcoords.empty())
+                {
+                    const size_t T = static_cast<size_t>(Index.texcoord_index) * 2;
+                    Vertex.U = Attrib.texcoords[T + 0];
+                    Vertex.V = Attrib.texcoords[T + 1];
+                }
+
+                uint32_t ExistingIndex = FindVertex(UniqueVertices, Vertex);
+
+                if (ExistingIndex != UINT32_MAX)
+                {
+                    TriangleIndices[Corner] = ExistingIndex;
+                }
+                else
+                {
+                    const uint32_t NewIndex = static_cast<uint32_t>(UniqueVertices.size());
+                    UniqueVertices.push_back(Vertex);
+
+                    Data.Vertices.push_back(Vertex.Px);
+                    Data.Vertices.push_back(Vertex.Py);
+                    Data.Vertices.push_back(Vertex.Pz);
+                    Data.Vertices.push_back(Vertex.Nx);
+                    Data.Vertices.push_back(Vertex.Ny);
+                    Data.Vertices.push_back(Vertex.Nz);
+                    Data.Vertices.push_back(Vertex.U);
+                    Data.Vertices.push_back(Vertex.V);
+
+                    TriangleIndices[Corner] = NewIndex;
+                }
             }
 
-            // Here i load Normals inside the struct
-            if (Index.normal_index >= 0 && !Attrib.normals.empty())
-            {
-                const size_t N = static_cast<size_t>(Index.normal_index) * 3;
-                Vertex.Nx = Attrib.normals[N + 0];
-                Vertex.Ny = Attrib.normals[N + 1];
-                Vertex.Nz = Attrib.normals[N + 2];
-            }
-
-            // Here i load UVs inside the struct
-            if (Index.texcoord_index >= 0 && !Attrib.texcoords.empty())
-            {
-                const size_t T = static_cast<size_t>(Index.texcoord_index) * 2;//textcoord should be UV TODO Check thi s info
-                Vertex.U = Attrib.texcoords[T + 0];
-                Vertex.V = Attrib.texcoords[T + 1];
-            }
-
-            //Check if vertex has been readed before with the custom fun (very important return the new Index if found)
-            uint32_t ExistingIndex = FindVertex(UniqueVertices, Vertex);
-
-            if (ExistingIndex != UINT32_MAX)
-            {
-                Data.Indices.push_back(ExistingIndex); // present , adding only index
-            }
-            else
-            {
-                const uint32_t NewIndex = static_cast<uint32_t>(UniqueVertices.size());  //the new index is n before instert 
-                UniqueVertices.push_back(Vertex);//add the new vertex
-                Data.Indices.push_back(NewIndex);
-
-                // append to linear array: pos(3) + normal(3) + uv(2)
-                Data.Vertices.push_back(Vertex.Px);
-                Data.Vertices.push_back(Vertex.Py);
-                Data.Vertices.push_back(Vertex.Pz);
-                Data.Vertices.push_back(Vertex.Nx);
-                Data.Vertices.push_back(Vertex.Ny);
-                Data.Vertices.push_back(Vertex.Nz);
-                Data.Vertices.push_back(Vertex.U);
-                Data.Vertices.push_back(Vertex.V);
-            }
+            // winding invertito
+            Data.Indices.push_back(TriangleIndices[0]);
+            Data.Indices.push_back(TriangleIndices[2]);
+            Data.Indices.push_back(TriangleIndices[1]);
         }
     }
 
