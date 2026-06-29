@@ -1,6 +1,8 @@
 #include "VulkanContext.h"
 #include "Common.h"
 
+
+
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -10,8 +12,10 @@
 #include <stdexcept>
 #include <string>
 #include "ObjLoader.h"
+#include "TextureLoader.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
 
 // ── Validation-layer configuration ───────────────────────────────────
 
@@ -95,10 +99,18 @@ void VulkanContext::Init(GLFWwindow* InWindow)
 
     // For Model pipeline
     CreateDepthResources();
+    CreateTextureDescriptorSetLayout();
     CreateModelPipeline();
     CreateModelBuffers();
 
     CreateCommandPool();
+    CreateDescriptorPool();
+    CreateTextureSampler();
+
+    CreateTextureImage();
+    CreateTextureImageView();
+    CreateDescriptorSets();
+
     AllocateCommandBuffers();
     CreateSyncObjects();
 }
@@ -182,6 +194,14 @@ void VulkanContext::Cleanup()
 
         vkDestroyPipeline(Device, ModelPipeline, nullptr);
         vkDestroyPipelineLayout(Device, ModelPipelineLayout, nullptr);
+
+        //tecturing part cleanin
+        vkDestroySampler(Device, TextureSampler, nullptr);
+        vkDestroyImageView(Device, TextureImageView, nullptr);
+        vkDestroyImage(Device, TextureImage, nullptr);
+        vkFreeMemory(Device, TextureImageMemory, nullptr);
+        vkDestroyDescriptorPool(Device, TextureDescriptorPool, nullptr);
+        vkDestroyDescriptorSetLayout(Device, TextureDescriptorSetLayout, nullptr);
     }
 
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -728,6 +748,7 @@ void VulkanContext::RecordCommandBuffer(VkCommandBuffer InCmd, uint32_t InImageI
         vkCmdDraw(InCmd, VertexCount, 1, 0, 0);
     } else { // Model related
         vkCmdBindPipeline(InCmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ModelPipeline);
+        vkCmdBindDescriptorSets(InCmd,VK_PIPELINE_BIND_POINT_GRAPHICS,ModelPipelineLayout,0, 1,&TextureDescriptorSet,0, nullptr);
 
         float Aspect = static_cast<float>(SwapchainExtent.width) / static_cast<float>(SwapchainExtent.height);
 
@@ -1188,6 +1209,8 @@ void VulkanContext::CreateModelPipeline()
 
     VkPipelineLayoutCreateInfo LayoutInfo{};
     LayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    LayoutInfo.setLayoutCount = 1;
+    LayoutInfo.pSetLayouts = &TextureDescriptorSetLayout;
     LayoutInfo.pushConstantRangeCount = 1;
     LayoutInfo.pPushConstantRanges = &PushRange;
     CHECK_VK(vkCreatePipelineLayout(Device, &LayoutInfo, nullptr, &ModelPipelineLayout), "Failed creating layout");
@@ -1219,3 +1242,269 @@ void VulkanContext::CreateModelPipeline()
     vkDestroyShaderModule(Device, VertModule, nullptr);
     vkDestroyShaderModule(Device, FragModule, nullptr);
 }
+
+// texturing try 2
+void VulkanContext::CreateTextureDescriptorSetLayout()
+{
+    VkDescriptorSetLayoutBinding Binding{};
+    Binding.binding = 0;
+    Binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    Binding.descriptorCount = 1;
+    Binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutCreateInfo LayoutInfo{};
+    LayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    LayoutInfo.bindingCount = 1;
+    LayoutInfo.pBindings = &Binding;
+
+    CHECK_VK(vkCreateDescriptorSetLayout(Device, &LayoutInfo, nullptr, &TextureDescriptorSetLayout),
+             "Failed to create texture descriptor set layout");
+}
+
+void VulkanContext::CreateDescriptorPool()
+{
+    VkDescriptorPoolSize PoolSize{};
+    PoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    PoolSize.descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo PoolInfo{};
+    PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    PoolInfo.poolSizeCount = 1;
+    PoolInfo.pPoolSizes = &PoolSize;
+    PoolInfo.maxSets = 1;
+
+    CHECK_VK(vkCreateDescriptorPool(Device, &PoolInfo, nullptr, &TextureDescriptorPool),
+             "Failed to create descriptor pool");
+}
+
+void VulkanContext::CreateTextureSampler() // need to configure sampler 
+{
+    VkSamplerCreateInfo SamplerInfo{};
+    SamplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    SamplerInfo.magFilter = VK_FILTER_LINEAR;
+    SamplerInfo.minFilter = VK_FILTER_LINEAR;
+    SamplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    SamplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    SamplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    SamplerInfo.anisotropyEnable = VK_FALSE;
+    SamplerInfo.maxAnisotropy = 1.0f;
+    SamplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    SamplerInfo.unnormalizedCoordinates = VK_FALSE;
+    SamplerInfo.compareEnable = VK_FALSE;
+    SamplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    SamplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+    CHECK_VK(vkCreateSampler(Device, &SamplerInfo, nullptr, &TextureSampler),
+             "Failed to create texture sampler");
+}
+
+void VulkanContext::CreateDescriptorSets()
+{
+    VkDescriptorSetAllocateInfo AllocInfo{};
+    AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    AllocInfo.descriptorPool = TextureDescriptorPool;
+    AllocInfo.descriptorSetCount = 1;
+    AllocInfo.pSetLayouts = &TextureDescriptorSetLayout;
+
+    CHECK_VK(vkAllocateDescriptorSets(Device, &AllocInfo, &TextureDescriptorSet),
+             "Failed to allocate descriptor set");
+
+    VkDescriptorImageInfo ImageInfo{};
+    ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    ImageInfo.imageView = TextureImageView;
+    ImageInfo.sampler = TextureSampler;
+
+    VkWriteDescriptorSet Write{};
+    Write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    Write.dstSet = TextureDescriptorSet;
+    Write.dstBinding = 0;
+    Write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    Write.descriptorCount = 1;
+    Write.pImageInfo = &ImageInfo;
+
+    vkUpdateDescriptorSets(Device, 1, &Write, 0, nullptr);
+}
+
+VkCommandBuffer VulkanContext::BeginSingleTimeCommands()
+{
+    VkCommandBufferAllocateInfo AllocInfo{};
+    AllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    AllocInfo.commandPool = CommandPool;
+    AllocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer Cmd;
+    CHECK_VK(vkAllocateCommandBuffers(Device, &AllocInfo, &Cmd), "Failed to allocate single-time command buffer");
+
+    VkCommandBufferBeginInfo BeginInfo{};
+    BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    CHECK_VK(vkBeginCommandBuffer(Cmd, &BeginInfo), "Failed to begin single-time command buffer");
+    return Cmd;
+}
+
+void VulkanContext::EndSingleTimeCommands(VkCommandBuffer Cmd)
+{
+    CHECK_VK(vkEndCommandBuffer(Cmd), "Failed to end single-time command buffer");
+
+    VkSubmitInfo SubmitInfo{};
+    SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    SubmitInfo.commandBufferCount = 1;
+    SubmitInfo.pCommandBuffers = &Cmd;
+
+    CHECK_VK(vkQueueSubmit(GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE), "Failed to submit single-time command buffer");
+    CHECK_VK(vkQueueWaitIdle(GraphicsQueue), "Failed to wait graphics queue idle");
+
+    vkFreeCommandBuffers(Device, CommandPool, 1, &Cmd);
+}
+
+void VulkanContext::TransitionImageLayout(VkCommandBuffer Cmd, VkImage Image,
+                                          VkImageLayout OldLayout,
+                                          VkImageLayout NewLayout)
+{
+    VkImageMemoryBarrier Barrier{};
+    Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    Barrier.oldLayout = OldLayout;
+    Barrier.newLayout = NewLayout;
+    Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    Barrier.image = Image;
+    Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    Barrier.subresourceRange.baseMipLevel = 0;
+    Barrier.subresourceRange.levelCount = 1;
+    Barrier.subresourceRange.baseArrayLayer = 0;
+    Barrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags SrcStage;
+    VkPipelineStageFlags DstStage;
+
+    if (OldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+        NewLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+    {
+        Barrier.srcAccessMask = 0;
+        Barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        SrcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (OldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+             NewLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        SrcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        DstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else
+    {
+        throw std::runtime_error("Unsupported image layout transition");
+    }
+
+    vkCmdPipelineBarrier(Cmd, SrcStage, DstStage, 0, 0, nullptr, 0, nullptr, 1, &Barrier);
+}
+
+void VulkanContext::CopyBufferToImage(VkCommandBuffer Cmd, VkBuffer Buffer, VkImage Image,
+                                      uint32_t Width, uint32_t Height)
+{
+    VkBufferImageCopy Region{};
+    Region.bufferOffset = 0;
+    Region.bufferRowLength = 0;
+    Region.bufferImageHeight = 0;
+    Region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    Region.imageSubresource.mipLevel = 0;
+    Region.imageSubresource.baseArrayLayer = 0;
+    Region.imageSubresource.layerCount = 1;
+    Region.imageOffset = { 0, 0, 0 };
+    Region.imageExtent = { Width, Height, 1 };
+
+    vkCmdCopyBufferToImage(Cmd, Buffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &Region);
+}
+
+//CORE TEXTURE
+void VulkanContext::CreateTextureImage()
+{
+    TextureData Tex = LoadTexture("resources/textures/stormtrooper.png");
+
+    VkDeviceSize ImageSize = static_cast<VkDeviceSize>(Tex.Pixels.size());
+
+    // Staging buffer
+    VkBuffer StagingBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory StagingBufferMemory = VK_NULL_HANDLE;
+
+    VkBufferCreateInfo BufferInfo{};
+    BufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    BufferInfo.size = ImageSize;
+    BufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    BufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    CHECK_VK(vkCreateBuffer(Device, &BufferInfo, nullptr, &StagingBuffer), "Failed to create texture staging buffer");
+
+    VkMemoryRequirements MemReqs{};
+    vkGetBufferMemoryRequirements(Device, StagingBuffer, &MemReqs);
+
+    VkMemoryAllocateInfo AllocInfo{};
+    AllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    AllocInfo.allocationSize = MemReqs.size;
+    AllocInfo.memoryTypeIndex = FindMemoryType(
+        MemReqs.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    CHECK_VK(vkAllocateMemory(Device, &AllocInfo, nullptr, &StagingBufferMemory), "Failed to allocate texture staging memory");
+    CHECK_VK(vkBindBufferMemory(Device, StagingBuffer, StagingBufferMemory, 0), "Failed to bind texture staging buffer");
+
+    void* Mapped = nullptr;
+    CHECK_VK(vkMapMemory(Device, StagingBufferMemory, 0, ImageSize, 0, &Mapped), "Failed to map texture staging memory");
+    memcpy(Mapped, Tex.Pixels.data(), Tex.Pixels.size());
+    vkUnmapMemory(Device, StagingBufferMemory);
+
+    // Texture image
+    VkImageCreateInfo ImageInfo{};
+    ImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    ImageInfo.imageType = VK_IMAGE_TYPE_2D;
+    ImageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+    ImageInfo.extent = { static_cast<uint32_t>(Tex.Width), static_cast<uint32_t>(Tex.Height), 1 };
+    ImageInfo.mipLevels = 1;
+    ImageInfo.arrayLayers = 1;
+    ImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    ImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ImageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    ImageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    ImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    CHECK_VK(vkCreateImage(Device, &ImageInfo, nullptr, &TextureImage), "Failed to create texture image");
+
+    vkGetImageMemoryRequirements(Device, TextureImage, &MemReqs);
+
+    AllocInfo.allocationSize = MemReqs.size;
+    AllocInfo.memoryTypeIndex = FindMemoryType(MemReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    CHECK_VK(vkAllocateMemory(Device, &AllocInfo, nullptr, &TextureImageMemory), "Failed to allocate texture image memory");
+    CHECK_VK(vkBindImageMemory(Device, TextureImage, TextureImageMemory, 0), "Failed to bind texture image memory");
+
+    // Copy data into the image
+    VkCommandBuffer Cmd = BeginSingleTimeCommands();
+    TransitionImageLayout(Cmd, TextureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    CopyBufferToImage(Cmd, StagingBuffer, TextureImage, static_cast<uint32_t>(Tex.Width), static_cast<uint32_t>(Tex.Height));
+    TransitionImageLayout(Cmd, TextureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    EndSingleTimeCommands(Cmd);
+
+    // Cleanup staging
+    vkDestroyBuffer(Device, StagingBuffer, nullptr);
+    vkFreeMemory(Device, StagingBufferMemory, nullptr);
+}
+
+void VulkanContext::CreateTextureImageView()
+{
+    VkImageViewCreateInfo ViewInfo{};
+    ViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    ViewInfo.image = TextureImage;
+    ViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ViewInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+    ViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    ViewInfo.subresourceRange.baseMipLevel = 0;
+    ViewInfo.subresourceRange.levelCount = 1;
+    ViewInfo.subresourceRange.baseArrayLayer = 0;
+    ViewInfo.subresourceRange.layerCount = 1;
+
+    CHECK_VK(vkCreateImageView(Device, &ViewInfo, nullptr, &TextureImageView), "Failed to create texture image view");
+}
+

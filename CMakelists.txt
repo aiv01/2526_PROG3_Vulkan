@@ -26,12 +26,14 @@ find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(tinyobjloader REQUIRED)
 find_package(glm REQUIRED)
+find_package(stb REQUIRED)
 
 target_link_libraries(${EXEC_TARGET} PRIVATE
   Vulkan::Vulkan
   glfw
   tinyobjloader::tinyobjloader
   glm::glm
+  stb::stb
 )
 
 file(GLOB_RECURSE SHADERS ${CMAKE_SOURCE_DIR}/resources/shaders/*.vert ${CMAKE_SOURCE_DIR}/resources/shaders/*.frag)

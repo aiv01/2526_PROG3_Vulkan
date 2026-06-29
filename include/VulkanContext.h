@@ -84,6 +84,15 @@ private:
     VkPipeline                   ModelPipeline = VK_NULL_HANDLE;
     VkPipelineLayout             ModelPipelineLayout = VK_NULL_HANDLE;
 
+    // Texture
+    VkImage               TextureImage = VK_NULL_HANDLE;
+    VkDeviceMemory        TextureImageMemory = VK_NULL_HANDLE;
+    VkImageView           TextureImageView = VK_NULL_HANDLE;
+    VkSampler             TextureSampler = VK_NULL_HANDLE;
+
+    VkDescriptorSetLayout TextureDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool      TextureDescriptorPool = VK_NULL_HANDLE;
+    VkDescriptorSet       TextureDescriptorSet = VK_NULL_HANDLE;
 
     // Initialisation steps (called in order by Init)
     void CreateInstance();
@@ -93,10 +102,30 @@ private:
     void CreateLogicalDevice();
     void CreateSwapchain();
     void CreateImageViews();
-    void CreateCommandPool();
-    void AllocateCommandBuffers();
     void CreateRenderFinishedSemaphores();
+
+    void CreateDepthResources();
+
+    void CreateTextureDescriptorSetLayout();
+    void CreateModelPipeline();
+    void CreateModelBuffers();
+
+    void CreateCommandPool();
+    void CreateDescriptorPool();
+    void CreateTextureSampler();
+
+    void CreateTextureImage();
+    void CreateTextureImageView();
+    void CreateDescriptorSets();
+
+    void AllocateCommandBuffers();
     void CreateSyncObjects();
+
+
+    VkCommandBuffer BeginSingleTimeCommands();
+    void EndSingleTimeCommands(VkCommandBuffer Cmd);
+    void TransitionImageLayout(VkCommandBuffer Cmd, VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout);
+    void CopyBufferToImage(VkCommandBuffer Cmd, VkBuffer Buffer, VkImage Image, uint32_t Width, uint32_t Height);
 
     // Runtime helpers
     void RecordCommandBuffer(VkCommandBuffer InCmd, uint32_t InImageIndex);
@@ -117,7 +146,5 @@ private:
     void                    CreateVertexBuffer();
     uint32_t                FindMemoryType(uint32_t InTypeFilter, VkMemoryPropertyFlags InProps);
 
-    void                    CreateDepthResources();
-    void                    CreateModelPipeline();
-    void                    CreateModelBuffers();
+
 };
